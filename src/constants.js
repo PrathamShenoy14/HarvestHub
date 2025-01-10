@@ -1,1 +1,1 @@
-const DB_NAME = "HarvestHub";
+export const DB_NAME = "HarvestHub";

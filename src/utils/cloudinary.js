@@ -37,6 +37,24 @@ const deleteOnCloudinary = async(publicId) =>{
     }
 }
 
+export const deleteFromCloudinary = async (publicId) => {
+    try {
+        if (!publicId) return null;
+        
+        // Delete file from cloudinary
+        const result = await cloudinary.uploader.destroy(publicId);
+        return result;
+    } catch (error) {
+        console.log("Cloudinary delete error:", error);
+        return null;
+    }
+};
 
+export const getPublicIdFromURL = (url) => {
+    if (!url) return null;
+    const splitUrl = url.split('/');
+    const publicIdWithExtension = splitUrl[splitUrl.length - 1];
+    return publicIdWithExtension.split('.')[0]; // Remove file extension
+};
 
 export {uploadOnCloudinary,deleteOnCloudinary}
