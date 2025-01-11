@@ -7,7 +7,9 @@ import {
     updateAccountDetails,
     updateAvatar,
     updateFarmPhotos,
-    changePassword
+    changePassword,
+    deleteFarmPhoto,
+    deleteAvatar
 } from '../controllers/auth.controller.js';
 
 import { upload } from '../middlewares/multer.middleware.js';
@@ -40,12 +42,18 @@ router.patch("/update-avatar",
     updateAvatar
 );
 
-router.patch("/update-farm-photos",
-    upload.array("farmPhotos", 5),
+router.patch(
+    "/update-farm-photos",
+    upload.fields([
+        { name: "farmPhotos", maxCount: 5 }
+    ]),
     updateFarmPhotos
 );
 
 router.patch("/change-password", changePassword);
+
+router.delete("/delete-avatar", deleteAvatar);
+router.delete("/delete-farm-photo", deleteFarmPhoto);
 
 // Optional: Get user profile
 router.get("/profile", async (req, res) => {

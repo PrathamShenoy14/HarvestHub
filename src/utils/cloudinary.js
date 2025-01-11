@@ -14,17 +14,27 @@ cloudinary.config({
 const uploadOnCloudinary = async (localFilePath) => {
     try {
         if (!localFilePath) return null;
-        const response = await cloudinary.uploader.upload(localFilePath)
-        // file has been uploaded successfull
-        fs.unlinkSync(localFilePath);
+
+        // Upload file on cloudinary
+        const response = await cloudinary.uploader.upload(localFilePath, {
+            resource_type: "auto"
+        });
+
+        // File has been uploaded successfully
+        // Now remove the locally saved temp file
+        await fs.promises.unlink(localFilePath); // Using promises version for proper async handling
+
         return response;
 
     } catch (error) {
-        console.log(error);
-        fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
+        // Remove the locally saved temp file as the upload operation failed
+        await fs.promises.unlink(localFilePath).catch(unlinkError => {
+            console.log("Error while removing temp file:", unlinkError);
+        });
+        
         return null;
     }
-}
+};
 
 const deleteOnCloudinary = async(publicId) =>{
     try{

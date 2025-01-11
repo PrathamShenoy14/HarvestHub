@@ -2,6 +2,8 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { deleteFromCloudinary } from "../utils/cloudinary.js";
 import { getPublicIdFromURL } from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken";
+import fs from "fs";
 
 
 const generateTokens = async (user) => {
@@ -164,10 +166,34 @@ export const registerUser = async (req, res) => {
             password,
             role,
             contactNumber,
-            addresses
+            // Address fields
+            street,
+            city,
+            state,
+            pincode,
+            // Farmer specific fields
+            farmName,
+            farmDescription
         } = req.body;
 
-        // Check if user already exists
+        // Validate required fields
+        if (!username || !email || !password || !contactNumber || 
+            !street || !city || !state || !pincode) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required"
+            });
+        }
+
+        // Additional validation for farmer
+        if (role === "farmer" && (!farmName || !farmDescription)) {
+            return res.status(400).json({
+                success: false,
+                message: "Farm name and description are required"
+            });
+        }
+
+        // Check if user exists
         const existingUser = await User.findOne({
             $or: [{ email }, { username }]
         });
@@ -181,75 +207,72 @@ export const registerUser = async (req, res) => {
             });
         }
 
-        // Handle avatar upload
-        const avatarLocalPath = req.files?.avatar[0]?.path;
-        if(!avatarLocalPath){
+        // Handle file uploads
+        const avatarLocalPath = req.files?.avatar?.[0]?.path;
+        const farmPhotosLocalPaths = req.files?.farmPhotos?.map(file => file.path);
+
+        if (!avatarLocalPath) {
             return res.status(400).json({
                 success: false,
-                message: "Avatar is required"
+                message: "Avatar file is required"
             });
         }
+
+        // Upload avatar
         const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-        // Create user object based on role
+        if (!avatar.url) {
+            return res.status(400).json({
+                success: false,
+                message: "Error while uploading avatar"
+            });
+        }
+
+        // Create address object
+        const address = {
+            type: role === "farmer" ? "farm" : "home",
+            street,
+            city,
+            state,
+            pincode,
+            isDefault: true
+        };
+
+        // Create base user data
         const userData = {
             username,
             email,
             password,
             role: role || "customer",
             contactNumber,
-            avatar: avatar?.url,
-            addresses: addresses || [],
-            isActive: true
+            avatar: avatar.url,
+            addresses: [address]
         };
 
-        // If registering as farmer, validate farm details
+        // Add farmer specific data
         if (role === "farmer") {
-            const { farmName, location, description} = req.body;
-            
-            if (!farmName || !location || !description) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Farm details are required for farmer registration"
-                });
+            // Upload farm photos if provided
+            let farmPhotos = [];
+            if (farmPhotosLocalPaths?.length > 0) {
+                const uploadPromises = farmPhotosLocalPaths.map(path => 
+                    uploadOnCloudinary(path)
+                );
+                const uploadedPhotos = await Promise.all(uploadPromises);
+                farmPhotos = uploadedPhotos
+                    .filter(photo => photo?.url)
+                    .map(photo => photo.url);
             }
-
-            // Validate location details
-            if (!location.address || !location.city || 
-                !location.state || !location.pincode) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Complete farm location details are required"
-                });
-            }
-
-            // Handle farm photos upload
-            const farmPhotosLocalPath = req.files?.farmPhotos[0]?.path;
-            if(!farmPhotosLocalPath){
-                return res.status(400).json({
-                    success: false,
-                    message: "Farm photos are required"
-                });
-            }
-            const farmPhotos = await uploadOnCloudinary(farmPhotosLocalPath);
 
             userData.farmDetails = {
                 farmName,
-                location: {
-                    address: location.address,
-                    city: location.city,
-                    state: location.state,
-                    pincode: location.pincode,
-                    coordinates: location.coordinates || undefined
-                },
-                description,
-                farmPhotos: farmPhotos?.url || []
+                description: farmDescription,
+                farmPhotos
             };
         }
 
         // Create user
         const user = await User.create(userData);
-
+        
         // Generate tokens
         const { accessToken, refreshToken } = await generateTokens(user);
 
@@ -269,7 +292,7 @@ export const registerUser = async (req, res) => {
             .json({
                 success: true,
                 user: registeredUser,
-                message: "User registered successfully"
+                message: `${role === "farmer" ? "Farmer" : "User"} registered successfully`
             });
 
     } catch (error) {
@@ -283,91 +306,90 @@ export const registerUser = async (req, res) => {
 // Update account details (except password and avatar)
 export const updateAccountDetails = async (req, res) => {
     try {
-        const { 
-            username, 
-            email, 
-            contactNumber, 
-            addresses,
-            // For farmers
-            farmDetails 
-        } = req.body;
-
-        if (!username || !email || !contactNumber) {
-            return res.status(400).json({
-                success: false,
-                message: "Required fields are missing"
-            });
-        }
-
-        // Check if username/email is already taken by another user
-        const existingUser = await User.findOne({
-            $or: [
-                { email, _id: { $ne: req.user._id } },
-                { username, _id: { $ne: req.user._id } }
-            ]
-        });
-
-        if (existingUser) {
-            return res.status(409).json({
-                success: false,
-                message: existingUser.email === email ? 
-                    "Email already registered with another account" : 
-                    "Username already taken"
-            });
-        }
-
-        // Prepare update object
-        const updateData = {
+        const {
             username,
             email,
-            contactNumber
-        };
+            contactNumber,
+            street,
+            city,
+            state,
+            pincode,
+            farmName,
+            farmDescription
+        } = req.body;
 
-        // Add addresses if provided
-        if (addresses) {
-            updateData.addresses = addresses;
+        // Check for unique fields before updating
+        if (username || email) {
+            const existingUser = await User.findOne({
+                _id: { $ne: req.user._id }, // Exclude current user
+                $or: [
+                    ...(username ? [{ username }] : []),
+                    ...(email ? [{ email }] : [])
+                ]
+            });
+
+            if (existingUser) {
+                return res.status(409).json({
+                    success: false,
+                    message: existingUser.username === username 
+                        ? "Username already taken"
+                        : "Email already registered"
+                });
+            }
         }
 
-        // If user is farmer and farmDetails are provided
-        if (req.user.role === "farmer" && farmDetails) {
-            const { farmName, location, description } = farmDetails;
+        // Create update object
+        const updateData = {};
 
-            if (!farmName || !location || !description) {
-                return res.status(400).json({
-                    success: false,
-                    message: "All farm details are required"
-                });
-            }
+        // Update basic fields if provided
+        if (username) updateData.username = username;
+        if (email) updateData.email = email;
+        if (contactNumber) updateData.contactNumber = contactNumber;
 
-            // Validate location details
-            if (!location.address || !location.city || 
-                !location.state || !location.pincode) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Complete farm location details are required"
-                });
-            }
+        // Update address if any address field is provided
+        if (street || city || state || pincode) {
+            const user = await User.findById(req.user._id);
+            const currentAddress = user.addresses[0] || {};
 
-            updateData.farmDetails = {
-                farmName,
-                location: {
-                    address: location.address,
-                    city: location.city,
-                    state: location.state,
-                    pincode: location.pincode,
-                    coordinates: location.coordinates || undefined
-                },
-                description
-                // Note: farmPhotos not updated here as it should be handled separately
+            updateData["addresses.0"] = {
+                type: user.role === "farmer" ? "farm" : "home",
+                street: street || currentAddress.street,
+                city: city || currentAddress.city,
+                state: state || currentAddress.state,
+                pincode: pincode || currentAddress.pincode,
+                isDefault: true
             };
         }
 
+        // Update farm details if user is farmer
+        if (req.user.role === "farmer") {
+            if (farmName || farmDescription) {
+                const currentUser = await User.findById(req.user._id);
+                updateData.farmDetails = {
+                    ...currentUser.farmDetails,
+                    ...(farmName && { farmName }),
+                    ...(farmDescription && { farmDescription })
+                };
+            }
+        }
+
+        // If no fields to update
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide at least one field to update"
+            });
+        }
+
+        // Update user
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {
                 $set: updateData
             },
-            { new: true }
+            {
+                new: true
+            }
         ).select("-password -refreshToken");
 
         return res.status(200).json({
@@ -443,6 +465,7 @@ export const updateAvatar = async (req, res) => {
 // Update farm photos with previous photos deletion
 export const updateFarmPhotos = async (req, res) => {
     try {
+        // Check if user is farmer
         if (req.user.role !== "farmer") {
             return res.status(403).json({
                 success: false,
@@ -450,67 +473,149 @@ export const updateFarmPhotos = async (req, res) => {
             });
         }
 
-        const farmPhotosLocalPath = req.files?.farmPhotos;
-
-        if (!farmPhotosLocalPath || farmPhotosLocalPath.length === 0) {
+        // Check if files exist
+        const farmPhotosLocalPaths = req.files?.farmPhotos?.map(file => file.path);
+        
+        if (!farmPhotosLocalPaths?.length) {
             return res.status(400).json({
                 success: false,
-                message: "Farm photos are required"
+                message: "No photos provided"
             });
         }
 
-        // Get current user with farm photos
+        // Get current user
         const currentUser = await User.findById(req.user._id);
         
-        // Upload new photos to cloudinary
-        const uploadPromises = farmPhotosLocalPath.map(file => 
-            uploadOnCloudinary(file.path)
-        );
+        // Calculate how many more photos can be added
+        const currentPhotoCount = currentUser.farmDetails?.farmPhotos?.length || 0;
+        const availableSlots = 5 - currentPhotoCount;
 
-        const uploadedPhotos = await Promise.all(uploadPromises);
+        if (availableSlots <= 0) {
+            // Clean up all uploaded files since we can't process them
+            const deletePromises = farmPhotosLocalPaths.map(filePath => 
+                fs.promises.unlink(filePath)
+            );
+            
+            await Promise.all(deletePromises).catch(err => 
+                console.log("Error deleting temp files:", err)
+            );
 
-        // Filter out any failed uploads and get URLs
-        const photoUrls = uploadedPhotos
-            .filter(photo => photo && photo.url)
-            .map(photo => photo.url);
-
-        if (photoUrls.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Error while uploading farm photos"
+                message: "Maximum photo limit (5) reached. Delete some photos first."
             });
         }
 
-        // Delete previous farm photos if they exist
-        if (currentUser.farmDetails?.farmPhotos?.length > 0) {
-            const deletePromises = currentUser.farmDetails.farmPhotos.map(photoUrl => {
-                const publicId = getPublicIdFromURL(photoUrl);
-                return deleteFromCloudinary(publicId);
-            });
-            await Promise.all(deletePromises);
+        // Separate files into processable and excess
+        const filesToProcess = farmPhotosLocalPaths.slice(0, availableSlots);
+        const excessFiles = farmPhotosLocalPaths.slice(availableSlots);
+
+        // Delete excess files immediately
+        if (excessFiles.length > 0) {
+            const deletePromises = excessFiles.map(filePath => 
+                fs.promises.unlink(filePath)
+            );
+            
+            await Promise.all(deletePromises).catch(err => 
+                console.log("Error deleting excess files:", err)
+            );
         }
 
-        // Update user's farm photos
+        // Upload processable files to cloudinary
+        const uploadPromises = filesToProcess.map(path => 
+            uploadOnCloudinary(path)
+        );
+        
+        const uploadedPhotos = await Promise.all(uploadPromises);
+        const newPhotoUrls = uploadedPhotos
+            .filter(photo => photo?.url)
+            .map(photo => photo.url);
+
+        // Add new photos to existing ones
+        const updatedPhotos = [
+            ...(currentUser.farmDetails?.farmPhotos || []),
+            ...newPhotoUrls
+        ];
+
+        // Update user with new photos
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {
                 $set: {
-                    "farmDetails.farmPhotos": photoUrls
+                    "farmDetails.farmPhotos": updatedPhotos
+                }
+            },
+            {
+                new: true
+            }
+        ).select("-password -refreshToken");
+
+        return res.status(200).json({
+            success: true,
+            message: `Added ${newPhotoUrls.length} photos successfully. ${excessFiles.length ? `${excessFiles.length} photos were skipped due to limit.` : ''}`,
+            user,
+            photosAdded: newPhotoUrls.length,
+            photosSkipped: excessFiles.length,
+            totalPhotos: updatedPhotos.length,
+            remainingSlots: 5 - updatedPhotos.length
+        });
+
+    } catch (error) {
+        // Ensure cleanup in case of any error
+        if (farmPhotosLocalPaths?.length) {
+            const deletePromises = farmPhotosLocalPaths.map(filePath => 
+                fs.promises.unlink(filePath)
+            );
+            
+            await Promise.all(deletePromises).catch(err => 
+                console.log("Error deleting temp files:", err)
+            );
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: error?.message || "Error while updating farm photos"
+        });
+    }
+};
+
+// Add a controller to delete specific photos
+export const deleteFarmPhoto = async (req, res) => {
+    try {
+        const { photoUrl } = req.body;
+
+        if (!photoUrl) {
+            return res.status(400).json({
+                success: false,
+                message: "Photo URL is required"
+            });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $pull: {
+                    "farmDetails.farmPhotos": photoUrl
                 }
             },
             { new: true }
         ).select("-password -refreshToken");
 
+        // Optionally delete from Cloudinary
+        const publicId = getPublicIdFromURL(photoUrl);
+        await deleteFromCloudinary(publicId);
+
         return res.status(200).json({
             success: true,
-            message: "Farm photos updated successfully",
-            user
+            message: "Photo deleted successfully",
+            user,
+            remainingSlots: 5 - (user.farmDetails?.farmPhotos?.length || 0)
         });
 
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: error?.message || "Error while updating farm photos"
+            message: error?.message || "Error while deleting farm photo"
         });
     }
 };
@@ -553,6 +658,47 @@ export const changePassword = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: error?.message || "Error while changing password"
+        });
+    }
+};
+
+export const deleteAvatar = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        // Check if user has an avatar
+        if (!user.avatar) {
+            return res.status(400).json({
+                success: false,
+                message: "No avatar found to delete"
+            });
+        }
+
+        // Delete from Cloudinary
+        const publicId = getPublicIdFromURL(user.avatar);
+        await deleteFromCloudinary(publicId);
+
+        // Update user with default avatar or null
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    avatar: "" // or set to default avatar URL if you have one
+                }
+            },
+            { new: true }
+        ).select("-password -refreshToken");
+
+        return res.status(200).json({
+            success: true,
+            message: "Avatar deleted successfully",
+            user: updatedUser
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error?.message || "Error while deleting avatar"
         });
     }
 }; 

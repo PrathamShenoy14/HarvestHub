@@ -20,7 +20,8 @@ const userSchema = new mongoose.Schema({
     },
     avatar: {
         type: String, // cloudinary url
-        required: true
+        required: true,
+        default: ""
     },
     password: {
         type: String,
@@ -39,31 +40,18 @@ const userSchema = new mongoose.Schema({
         required: true
     },
     farmDetails: {
-        required: function() {
-            return this.role === 'farmer';
+        farmName: {
+            type: String,
+            required: function() { return this.role === 'farmer' }
         },
-        type: {
-            farmName: {
-                type: String,
-                trim: true
-            },
-            location: {
-                address: String,
-                city: String,
-                state: String,
-                pincode: String,
-                coordinates: {
-                    type: {
-                        type: String,
-                        default: 'Point'
-                    },
-                    coordinates: [Number] // [longitude, latitude]
-                }
-            },
-            description: String,
-            farmPhotos: [String], // Array of cloudinary URLs
+        description: {
+            type: String,
+            required: function() { return this.role === 'farmer' }
         },
-        default: undefined // Array of cloudinary URLs
+        // Use the user's address as farm location
+        farmPhotos: {
+            type: [String]
+        }
     },
     contactNumber: {
         type: String,
