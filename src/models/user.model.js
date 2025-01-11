@@ -50,7 +50,20 @@ const userSchema = new mongoose.Schema({
         },
         // Use the user's address as farm location
         farmPhotos: {
-            type: [String]
+            type: [String],
+            validate: {
+                validator: function(photos) {
+                    // Only apply validation if user is a farmer
+                    if (this.role === 'farmer') {
+                        return photos.length >= 1 && photos.length <= 5;
+                    }
+                    return true;
+                },
+                message: 'Farmers must have between 1 and 5 farm photos'
+            },
+            required: function() { 
+                return this.role === 'farmer';
+            }
         }
     },
     contactNumber: {

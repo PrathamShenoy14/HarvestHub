@@ -582,6 +582,14 @@ export const updateFarmPhotos = async (req, res) => {
 // Add a controller to delete specific photos
 export const deleteFarmPhoto = async (req, res) => {
     try {
+        // Check if user is farmer
+        if (req.user.role !== "farmer") {
+            return res.status(403).json({
+                success: false,
+                message: "Only farmers can delete farm photos"
+            });
+        }
+
         const { photoUrl } = req.body;
 
         if (!photoUrl) {
@@ -591,6 +599,29 @@ export const deleteFarmPhoto = async (req, res) => {
             });
         }
 
+        // Get current user
+        const currentUser = await User.findById(req.user._id);
+
+        // Check if photo exists in farm photos
+        if (!currentUser.farmDetails?.farmPhotos?.includes(photoUrl)) {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found in farm photos"
+            });
+        }
+
+        // Prevent deletion of last photo
+        if (currentUser.farmDetails?.farmPhotos?.length <= 1) {
+            return res.status(400).json({
+                success: false,
+                message: "Cannot delete the last photo. Farm must have at least one photo"
+            });
+        }
+
+        // Extract public ID from Cloudinary URL
+        const publicId = getPublicIdFromURL(photoUrl);
+        await deleteFromCloudinary(publicId);
+        // If Cloudinary delete was successful, update database
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {
@@ -601,18 +632,16 @@ export const deleteFarmPhoto = async (req, res) => {
             { new: true }
         ).select("-password -refreshToken");
 
-        // Optionally delete from Cloudinary
-        const publicId = getPublicIdFromURL(photoUrl);
-        await deleteFromCloudinary(publicId);
-
         return res.status(200).json({
             success: true,
-            message: "Photo deleted successfully",
+            message: "Farm photo deleted successfully",
             user,
-            remainingSlots: 5 - (user.farmDetails?.farmPhotos?.length || 0)
+            remainingPhotos: user.farmDetails?.farmPhotos?.length || 0,
+            availableSlots: 5 - (user.farmDetails?.farmPhotos?.length || 0)
         });
 
     } catch (error) {
+        console.log("Delete farm photo error:", error);
         return res.status(500).json({
             success: false,
             message: error?.message || "Error while deleting farm photo"

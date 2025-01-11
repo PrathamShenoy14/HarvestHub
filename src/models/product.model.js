@@ -1,11 +1,10 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    trim: true,
-    index: true
+    trim: true
   },
   description: {
     type: String,
@@ -13,35 +12,33 @@ const productSchema = new mongoose.Schema({
   },
   price: {
     type: Number,
-    required: true,
-    min: 0
-  },
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-    required: true,
-    index: true
-  },
-  farmer: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   stock: {
     type: Number,
     required: true,
-    min: 0,
     default: 0
+  },
+  category: {
+    type: String,
+    required: true,
+    enum: ['vegetables', 'fruits', 'grains', 'dairy', 'other']
   },
   unit: {
     type: String,
     required: true,
-    enum: ['kg', 'gram', 'piece', 'dozen', 'liter', 'quintal']
+    enum: ['kg', 'dozen', 'piece', 'litre', 'gram']
   },
-  images: [{
-    type: String
-  }],
+  images: {
+    type: [String],
+    validate: {
+      validator: function(images) {
+        return images.length >= 1 && images.length <= 5;
+      },
+      message: 'Products must have between 1 and 5 photos'
+    },
+    required: true
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -49,6 +46,11 @@ const productSchema = new mongoose.Schema({
   isOutOfStock: {
     type: Boolean,
     default: false
+  },
+  farmer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
   }
 }, {timestamps: true});
 

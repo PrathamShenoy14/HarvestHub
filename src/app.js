@@ -18,4 +18,8 @@ import userRouter from './routes/user.route.js'
 
 app.use('/api/users', userRouter)
 
+import productRouter from './routes/product.route.js'
+
+app.use('/api/products', productRouter)
+
 export {app}
