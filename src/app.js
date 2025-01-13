@@ -22,4 +22,16 @@ import productRouter from './routes/product.route.js'
 
 app.use('/api/products', productRouter)
 
+import cartRouter from "./routes/cart.route.js";
+
+app.use("/api/cart", cartRouter);
+
+import wishlistRouter from "./routes/wishlist.route.js";
+
+app.use("/api/wishlist", wishlistRouter);
+
+import orderRouter from "./routes/order.route.js";
+
+app.use("/api/orders", orderRouter);
+
 export {app}
