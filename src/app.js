@@ -34,4 +34,7 @@ import orderRouter from "./routes/order.route.js";
 
 app.use("/api/orders", orderRouter);
 
+import paymentRouter from "./routes/payment.route.js";
+app.use("/api/payments", paymentRouter);
+
 export {app}

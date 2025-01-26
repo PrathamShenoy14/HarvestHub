@@ -1,9 +1,7 @@
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
 import { Cart } from "../models/cart.model.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-
+import { razorpay } from "../config/razorpay.config.js";
 // Create order from cart
 export const createOrder = async (req, res) => {
     try {
@@ -289,7 +287,6 @@ export const updateOrderStatus = async (req, res) => {
 export const cancelOrder = async (req, res) => {
     try {
         const { orderId } = req.params;
-
         const order = await Order.findById(orderId);
 
         if (!order) {
@@ -315,7 +312,26 @@ export const cancelOrder = async (req, res) => {
             });
         }
 
+        if (order.paymentMethod === 'online' && order.paymentStatus === 'completed') {
+            const refund = await razorpay.payments.refund(order.paymentDetails.razorpayPaymentId, {
+                "amount": order.totalAmount * 100, // Amount in paise
+                "speed": "normal",
+            });
+            
+            // Check if the refund was successful
+            if (refund.status !== 'processed') {
+                return res.status(400).json({
+                    success: false,
+                    message: "Refund failed"
+                });
+            }
+   
+        }
+
+
         order.status = 'cancelled';
+        order.paymentStatus = 'refunded';
+
 
         // Restore product stock
         for (const item of order.items) {
