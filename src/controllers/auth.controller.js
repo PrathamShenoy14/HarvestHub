@@ -171,9 +171,6 @@ export const registerUser = async (req, res) => {
             city,
             state,
             pincode,
-            // Farmer specific fields
-            farmName,
-            farmDescription
         } = req.body;
 
         // Validate required fields
@@ -185,13 +182,125 @@ export const registerUser = async (req, res) => {
             });
         }
 
-        // Additional validation for farmer
-        if (role === "farmer" && (!farmName || !farmDescription)) {
-            return res.status(400).json({
+        // Check if user exists
+        const existingUser = await User.findOne({
+            $or: [{ email }, { username }]
+        });
+
+        if (existingUser) {
+            return res.status(409).json({
                 success: false,
-                message: "Farm name and description are required"
+                message: existingUser.email === email ? 
+                    "Email already registered" : 
+                    "Username already taken"
             });
         }
+
+        // Handle file uploads
+        const avatarLocalPath = req.files?.avatar?.[0]?.path;
+
+        if (!avatarLocalPath) {
+            return res.status(400).json({
+                success: false,
+                message: "Avatar file is required"
+            });
+        }
+
+        // Upload avatar
+        const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+        if (!avatar.url) {
+            return res.status(400).json({
+                success: false,
+                message: "Error while uploading avatar"
+            });
+        }
+
+        // Create address object
+        const address = {
+            type: role === "farmer" ? "farm" : "home",
+            street,
+            city,
+            state,
+            pincode,
+            isDefault: true
+        };
+
+        // Create base user data
+        const userData = {
+            username,
+            email,
+            password,
+            role: role || "customer",
+            contactNumber,
+            avatar: avatar.url,
+            addresses: [address]
+        };
+
+        // Create user
+        const user = await User.create(userData);
+        
+        // Generate tokens
+        const { accessToken, refreshToken } = await generateTokens(user);
+
+        // Get user without sensitive info
+        const registeredUser = await User.findById(user._id)
+            .select("-password -refreshToken");
+
+        const options = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production"
+        };
+
+        return res
+            .status(201)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .json({
+                success: true,
+                user: registeredUser,
+                message: `${role === "farmer" ? "Farmer" : "User"} registered successfully`
+            });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error?.message || "Error while registering user"
+        });
+    }
+};
+
+export const registerFarmer = async (req, res) => {
+    try {
+        const {
+            username,
+            email,
+            password,
+            role,
+            contactNumber,
+            // Address fields
+            street,
+            city,
+            state,
+            pincode,
+            // Farmer specific fields
+            farmName,
+            farmDescription,
+            bankAccountHolderName,
+            bankAccountNumber,
+            ifscCode,
+            bankName,
+        } = req.body;
+
+        // Validate required fields
+        if (!username || !email || !password || !contactNumber || !bankAccountNumber || bankName ||
+            !street || !city || !state || !pincode || !bankAccountHolderName || !ifscCode) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required"
+            });
+        }
+
 
         // Check if user exists
         const existingUser = await User.findOne({
@@ -237,6 +346,9 @@ export const registerUser = async (req, res) => {
             pincode,
             isDefault: true
         };
+        const encryptedBankAccountNumber = encrypt(bankAccountNumber);
+        const encryptedIfscCode = encrypt(ifscCode);
+        const encryptedBankName = encrypt(bankName);
 
         // Create base user data
         const userData = {
@@ -246,7 +358,11 @@ export const registerUser = async (req, res) => {
             role: role || "customer",
             contactNumber,
             avatar: avatar.url,
-            addresses: [address]
+            addresses: [address],
+            bankAccountHolderName,
+            bankAccountNumber: encryptedBankAccountNumber,
+            ifscCode: encryptedIfscCode,
+            bankName: encryptedBankName
         };
 
         // Add farmer specific data
@@ -262,7 +378,7 @@ export const registerUser = async (req, res) => {
                     .filter(photo => photo?.url)
                     .map(photo => photo.url);
             }
-
+            
             userData.farmDetails = {
                 farmName,
                 description: farmDescription,
@@ -315,7 +431,11 @@ export const updateAccountDetails = async (req, res) => {
             state,
             pincode,
             farmName,
-            farmDescription
+            farmDescription,
+            bankAccountHolderName,
+            bankAccountNumber,
+            ifscCode,
+            bankName,
         } = req.body;
 
         // Check for unique fields before updating
@@ -363,6 +483,19 @@ export const updateAccountDetails = async (req, res) => {
 
         // Update farm details if user is farmer
         if (req.user.role === "farmer") {
+            if (bankAccountHolderName) updateData.bankAccountHolderName = bankAccountHolderName;
+            if (bankAccountNumber) {
+                const encryptedBankAccountNumber = encrypt(bankAccountNumber);
+                updateData.bankAccountNumber = encryptedBankAccountNumber.encryptedData; // Store encrypted data
+            }
+            if (ifscCode) {
+                const encryptedIfscCode = encrypt(ifscCode);
+                updateData.ifscCode = encryptedIfscCode.encryptedData; // Store encrypted data
+            }
+            if (bankName) {
+                const encryptedBankName = encrypt(bankName);
+                updateData.bankName = encryptedBankName.encryptedData; // Store encrypted data
+            }
             if (farmName || farmDescription) {
                 const currentUser = await User.findById(req.user._id);
                 updateData.farmDetails = {

@@ -83,6 +83,23 @@ const userSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    // New fields for bank details
+    bankAccountHolderName: {
+        type: String,
+        required: function() { return this.role === 'farmer' }
+    },
+    bankAccountNumber: {
+        type: String,
+        required: function() { return this.role === 'farmer' }
+    },
+    ifscCode: {
+        type: String,
+        required: function() { return this.role === 'farmer' }
+    },
+    bankName: {
+        type: String,
+        required: function() { return this.role === 'farmer' }
     }
 }, {timestamps: true});
 

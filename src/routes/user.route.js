@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { 
     loginUser,
     registerUser,
+    registerFarmer,
     refreshAccessToken,
     logout,
     updateAccountDetails,
@@ -18,11 +19,16 @@ import { verifyJWT } from '../middlewares/auth.middleware.js';
 const router = Router();
 
 // Authentication routes (public)
-router.post("/register", 
+router.post("/register/farmer", 
     upload.fields([
         { name: "avatar", maxCount: 1 },
         { name: "farmPhotos", maxCount: 5 }
     ]),
+    registerUser
+);
+
+router.post("/register/user", 
+    upload.single("avatar"), // Assuming you want to upload an avatar for users
     registerUser
 );
 

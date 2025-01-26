@@ -121,6 +121,9 @@ export const verifyPayment = async (req, res) => {
             return order.save();
         }));
 
+        // Invoke the distributePayments function
+        await distributePayments(orders);
+
         return res.status(200).json({
             success: true,
             message: "Payment verified successfully",
@@ -132,6 +135,43 @@ export const verifyPayment = async (req, res) => {
             success: false,
             message: error?.message || "Error verifying payment"
         });
+    }
+};
+
+// Function to distribute payments to farmers
+const distributePayments = async (orders) => {
+    for (const order of orders) {
+        const items = order.items; // Assuming order.items contains farmerId and amount details
+
+        for (const item of items) {
+            const farmerId = item.farmerId;
+            const amountToPay = item.amount; // Amount in paise
+
+            // Retrieve farmer's bank details from your database
+            const farmer = await User.findById(farmerId);
+
+            // Initiate payout to the farmer
+            const payoutOptions = {
+                amount: amountToPay, // Amount in paise
+                currency: 'INR',
+                mode: 'transfer',
+                recipient: {
+                    bank_account: {
+                        account_number: farmer.bankAccountNumber, // Farmer's bank account number
+                        ifsc: farmer.ifscCode, // Farmer's IFSC code
+                        account_holder_name: farmer.bankAccountHolderName // Farmer's name
+                    }
+                }
+            };
+
+            try {
+                const payout = await razorpay.payouts.create(payoutOptions);
+                console.log(`Payout successful for farmer ${farmerId}:`, payout);
+            } catch (error) {
+                console.error(`Error processing payout for farmer ${farmerId}:`, error);
+                // Handle payout failure (e.g., log it, notify someone, etc.)
+            }
+        }
     }
 };
 
