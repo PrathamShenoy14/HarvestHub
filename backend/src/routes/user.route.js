@@ -24,7 +24,7 @@ router.post("/register/farmer",
         { name: "avatar", maxCount: 1 },
         { name: "farmPhotos", maxCount: 5 }
     ]),
-    registerUser
+    registerFarmer
 );
 
 router.post("/register/user", 

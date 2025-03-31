@@ -4,7 +4,7 @@ import { deleteFromCloudinary } from "../utils/cloudinary.js";
 import { getPublicIdFromURL } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import fs from "fs";
-
+import {encrypt} from '../utils/crypto.js'
 
 const generateTokens = async (user) => {
     try {
@@ -163,8 +163,8 @@ export const registerUser = async (req, res) => {
         const {
             username,
             email,
+            role="customer",
             password,
-            role,
             contactNumber,
             // Address fields
             street,
@@ -197,7 +197,7 @@ export const registerUser = async (req, res) => {
         }
 
         // Handle file uploads
-        const avatarLocalPath = req.files?.avatar?.[0]?.path;
+        const avatarLocalPath = req.file?.path;
 
         if (!avatarLocalPath) {
             return res.status(400).json({
@@ -218,7 +218,7 @@ export const registerUser = async (req, res) => {
 
         // Create address object
         const address = {
-            type: role === "farmer" ? "farm" : "home",
+            type:"home",
             street,
             city,
             state,
@@ -231,7 +231,7 @@ export const registerUser = async (req, res) => {
             username,
             email,
             password,
-            role: role || "customer",
+            role:"customer",
             contactNumber,
             avatar: avatar.url,
             addresses: [address]
@@ -292,8 +292,11 @@ export const registerFarmer = async (req, res) => {
             bankName,
         } = req.body;
 
+        console.log("Request Body:", req.body);
+        console.log("Request Files:", req.files);   
+
         // Validate required fields
-        if (!username || !email || !password || !contactNumber || !bankAccountNumber || bankName ||
+        if (!username || !email || !password || !contactNumber || !bankAccountNumber || !bankName ||
             !street || !city || !state || !pincode || !bankAccountHolderName || !ifscCode) {
             return res.status(400).json({
                 success: false,

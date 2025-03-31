@@ -5,9 +5,9 @@ import cors from 'cors'
 const app = express();
 
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials:true
-}));
+    origin: "http://localhost:5173", // Allow frontend to make requests
+    credentials: true,
+  }));
 
 app.use(express.json());
 app.use(express.urlencoded({extended:true, limit:'16kb'}));
