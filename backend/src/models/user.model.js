@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema({
             type: String,
             required: function() { return this.role === 'farmer' }
         },
-        description: {
+        farmDescription: {
             type: String,
             required: function() { return this.role === 'farmer' }
         },

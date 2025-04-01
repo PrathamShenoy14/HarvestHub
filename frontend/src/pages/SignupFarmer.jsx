@@ -2,6 +2,7 @@ import { PhotoIcon } from '@heroicons/react/24/solid';
 import { useState,} from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 
 function SignupFarmer() {
     const [username, setUsername] = useState('');
@@ -117,7 +118,9 @@ function SignupFarmer() {
   
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <div className='flex flex-col bg-gray-100 gap-4'>
+          <Navbar/>
+          <div className="flex min-h-screen items-center justify-center bg-gray-100 ">
           {step==1 && (
               <div className="w-full max-w-2xl rounded-lg bg-white p-8 shadow-md">
                 <h2 className="text-2xl font-semibold text-gray-900 text-center">Signup Form</h2>
@@ -137,7 +140,7 @@ function SignupFarmer() {
                             <div className="text-center">
                                 <PhotoIcon className="mx-auto h-12 w-12 text-gray-300" />
                                 <div className="mt-4 flex text-sm text-gray-600">
-                                    <label htmlFor="file-upload" className="cursor-pointer font-semibold text-indigo-600 hover:text-indigo-500">
+                                    <label htmlFor="file-upload" className="cursor-pointer font-semibold text-green-600 hover:text-green-500">
                                         Upload an image
                                         <input id="file-upload" name="file-upload" type="file" accept="image/*"
                                             className="sr-only" onChange={handleFileChange} />
@@ -188,12 +191,12 @@ function SignupFarmer() {
                 {/* Register Button with Loading State */}
                 <div className="mt-6 flex justify-center">
                     <button onClick={handleNext}
-                        className={`w-full rounded-md cursor-pointer px-4 py-2 font-semibold text-white bg-indigo-600 hover:bg-indigo-500`}>
+                        className={`w-full rounded-md cursor-pointer px-4 py-2 font-semibold text-white bg-green-600 hover:bg-green-500`}>
                         Next
                     </button>
                 </div>
                 <p className="text-center text-gray-600 mt-4">
-                    Have an account already? <Link to="/login" className="text-indigo-600 cursor-pointer hover:underline">Login now</Link>
+                    Have an account already? <Link to="/login" className="text-green-600 cursor-pointer hover:underline">Login now</Link>
                 </p>
               </div>
           )}
@@ -224,7 +227,7 @@ function SignupFarmer() {
                     {[0, 1, 2].map((index) => (
                       <div key={index} className="relative flex flex-col items-center border border-dashed border-gray-300 p-4 rounded-lg">
                         <PhotoIcon className="h-12 w-12 text-gray-300" />
-                        <label className="mt-2 text-sm text-indigo-600 cursor-pointer hover:text-indigo-500">
+                        <label className="mt-2 text-sm text-green-600 cursor-pointer hover:text-green-500">
                           Upload Photo {index + 1}
                           <input type="file" accept="image/*" className="sr-only"
                             onChange={(e) => handleFarmPhotoChange(e, index)} />
@@ -241,12 +244,12 @@ function SignupFarmer() {
                 <button onClick={handlePrev} className="rounded-md cursor-pointer px-4 py-2 font-semibold text-white bg-gray-500 hover:bg-gray-400">
                   Back
                 </button>
-                <button onClick={handleNext} className="rounded-md cursor-pointer px-4 py-2 font-semibold text-white bg-indigo-600 hover:bg-indigo-500">
+                <button onClick={handleNext} className="rounded-md cursor-pointer px-4 py-2 font-semibold text-white bg-green-600 hover:bg-green-500">
                   Next
                 </button>
               </div>
               <p className="text-center text-gray-600 mt-4">
-                    Have an account already? <Link to="/login" className="text-indigo-600 cursor-pointer hover:underline">Login now</Link>
+                    Have an account already? <Link to="/login" className="text-green-600 cursor-pointer hover:underline">Login now</Link>
               </p>
             </div>
           )}
@@ -291,17 +294,18 @@ function SignupFarmer() {
                   </button>
             
                   <button onClick={handleRegister} disabled={loading}
-                      className={`rounded-md cursor-pointer px-4 py-2 font-semibold text-white ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"}`}>
+                      className={`rounded-md cursor-pointer px-4 py-2 font-semibold text-white ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-500"}`}>
                       {loading ? "Registering..." : "Register"}
                   </button>
                
                 </div>
                 <p className="text-center text-gray-600 mt-4">
-                    Have an account already? <Link to="/login" className="text-indigo-600 cursor-pointer hover:underline">Login now</Link>
+                    Have an account already? <Link to="/login" className="text-green-600 cursor-pointer hover:underline">Login now</Link>
                 </p>
               </div>
             )}          
             
+        </div>
         </div>
     );
 }

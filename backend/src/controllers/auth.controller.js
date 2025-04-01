@@ -384,7 +384,7 @@ export const registerFarmer = async (req, res) => {
             
             userData.farmDetails = {
                 farmName,
-                description: farmDescription,
+                farmDescription,
                 farmPhotos
             };
         }
@@ -601,117 +601,73 @@ export const updateAvatar = async (req, res) => {
 // Update farm photos with previous photos deletion
 export const updateFarmPhotos = async (req, res) => {
     try {
-        // Check if user is farmer
         if (req.user.role !== "farmer") {
             return res.status(403).json({
                 success: false,
-                message: "Only farmers can update farm photos"
+                message: "Only farmers can update farm photos",
             });
         }
 
-        // Check if files exist
+        const { index } = req.body; // Index of the photo to replace
         const farmPhotosLocalPaths = req.files?.farmPhotos?.map(file => file.path);
-        
+
         if (!farmPhotosLocalPaths?.length) {
-            return res.status(400).json({
-                success: false,
-                message: "No photos provided"
-            });
+            return res.status(400).json({ success: false, message: "No photos provided" });
         }
 
-        // Get current user
+        // Fetch current user
         const currentUser = await User.findById(req.user._id);
-        
-        // Calculate how many more photos can be added
-        const currentPhotoCount = currentUser.farmDetails?.farmPhotos?.length || 0;
-        const availableSlots = 5 - currentPhotoCount;
-
-        if (availableSlots <= 0) {
-            // Clean up all uploaded files since we can't process them
-            const deletePromises = farmPhotosLocalPaths.map(filePath => 
-                fs.promises.unlink(filePath)
-            );
-            
-            await Promise.all(deletePromises).catch(err => 
-                console.log("Error deleting temp files:", err)
-            );
-
-            return res.status(400).json({
-                success: false,
-                message: "Maximum photo limit (5) reached. Delete some photos first."
-            });
+        if (!currentUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        // Separate files into processable and excess
-        const filesToProcess = farmPhotosLocalPaths.slice(0, availableSlots);
-        const excessFiles = farmPhotosLocalPaths.slice(availableSlots);
+        let updatedPhotos = currentUser.farmDetails?.farmPhotos || [];
 
-        // Delete excess files immediately
-        if (excessFiles.length > 0) {
-            const deletePromises = excessFiles.map(filePath => 
-                fs.promises.unlink(filePath)
-            );
-            
-            await Promise.all(deletePromises).catch(err => 
-                console.log("Error deleting excess files:", err)
-            );
+        // ✅ Enforce max limit of 3
+        if (updatedPhotos.length > 3) {
+            return res.status(400).json({ success: false, message: "Max 3 photos allowed." });
         }
 
-        // Upload processable files to cloudinary
-        const uploadPromises = filesToProcess.map(path => 
-            uploadOnCloudinary(path)
-        );
-        
-        const uploadedPhotos = await Promise.all(uploadPromises);
-        const newPhotoUrls = uploadedPhotos
-            .filter(photo => photo?.url)
-            .map(photo => photo.url);
+        // ✅ Only allow replacing existing photos
+        if (index === undefined || index < 0 || index >= updatedPhotos.length) {
+            return res.status(400).json({ success: false, message: "Invalid index. Can only replace existing photos." });
+        }
 
-        // Add new photos to existing ones
-        const updatedPhotos = [
-            ...(currentUser.farmDetails?.farmPhotos || []),
-            ...newPhotoUrls
-        ];
+        // ✅ Delete old photo from Cloudinary (if valid URL)
+        if (updatedPhotos[index]?.startsWith("http")) {
+            const publicId = getPublicIdFromURL(updatedPhotos[index]);
+            if (publicId) {
+                await deleteFromCloudinary(publicId);
+            }
+        }
 
-        // Update user with new photos
+        // ✅ Upload new photo to Cloudinary
+        const uploadResponse = await uploadOnCloudinary(farmPhotosLocalPaths[0]);
+        if (!uploadResponse?.url) {
+            return res.status(500).json({ success: false, message: "Cloudinary upload failed" });
+        }
+
+        // ✅ Replace the specific photo
+        updatedPhotos[index] = uploadResponse.url;
+
+        // ✅ Save updated farm photos in DB
         const user = await User.findByIdAndUpdate(
             req.user._id,
-            {
-                $set: {
-                    "farmDetails.farmPhotos": updatedPhotos
-                }
-            },
-            {
-                new: true
-            }
+            { $set: { "farmDetails.farmPhotos": updatedPhotos } },
+            { new: true }
         ).select("-password -refreshToken");
 
         return res.status(200).json({
             success: true,
-            message: `Added ${newPhotoUrls.length} photos successfully. ${excessFiles.length ? `${excessFiles.length} photos were skipped due to limit.` : ''}`,
+            message: "Photo replaced successfully!",
             user,
-            photosAdded: newPhotoUrls.length,
-            photosSkipped: excessFiles.length,
-            totalPhotos: updatedPhotos.length,
-            remainingSlots: 5 - updatedPhotos.length
         });
 
     } catch (error) {
-        // Ensure cleanup in case of any error
-        if (farmPhotosLocalPaths?.length) {
-            const deletePromises = farmPhotosLocalPaths.map(filePath => 
-                fs.promises.unlink(filePath)
-            );
-            
-            await Promise.all(deletePromises).catch(err => 
-                console.log("Error deleting temp files:", err)
-            );
-        }
+        // ❌ Ensure temp files are always deleted
+        farmPhotosLocalPaths?.forEach(filePath => fs.promises.unlink(filePath).catch(err => console.log("Cleanup Error:", err)));
 
-        return res.status(500).json({
-            success: false,
-            message: error?.message || "Error while updating farm photos"
-        });
+        return res.status(500).json({ success: false, message: error?.message || "Server error" });
     }
 };
 

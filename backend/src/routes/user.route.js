@@ -12,6 +12,7 @@ import {
     deleteFarmPhoto,
     deleteAvatar
 } from '../controllers/auth.controller.js';
+import { User } from '../models/user.model.js';
 
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';

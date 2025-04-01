@@ -2,6 +2,7 @@ import { PhotoIcon } from '@heroicons/react/24/solid';
 import { useState,} from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 
 function SignupUser() {
     const [username, setUsername] = useState('');
@@ -61,7 +62,9 @@ function SignupUser() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <div className='flex flex-col bg-gray-100 gap-4'>
+            <Navbar/>
+            <div className="flex min-h-screen items-center justify-center bg-gray-100">
             <div className="w-full max-w-2xl rounded-lg bg-white p-8 shadow-md">
                 <h2 className="text-2xl font-semibold text-gray-900 text-center">Signup Form</h2>
 
@@ -80,7 +83,7 @@ function SignupUser() {
                             <div className="text-center">
                                 <PhotoIcon className="mx-auto h-12 w-12 text-gray-300" />
                                 <div className="mt-4 flex text-sm text-gray-600">
-                                    <label htmlFor="file-upload" className="cursor-pointer font-semibold text-indigo-600 hover:text-indigo-500">
+                                    <label htmlFor="file-upload" className="cursor-pointer font-semibold text-green-600 hover:text-green-500">
                                         Upload an image
                                         <input id="file-upload" name="file-upload" type="file" accept="image/*"
                                             className="sr-only" onChange={handleFileChange} />
@@ -131,15 +134,17 @@ function SignupUser() {
                 {/* Register Button with Loading State */}
                 <div className="mt-6 flex justify-center">
                     <button onClick={handleRegister} disabled={loading}
-                        className={`w-full rounded-md cursor-pointer px-4 py-2 font-semibold text-white ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500"}`}>
+                        className={`w-full rounded-md cursor-pointer px-4 py-2 font-semibold text-white ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-500"}`}>
                         {loading ? "Registering..." : "Register"}
                     </button>
                 </div>
                 <p className="text-center text-gray-600 mt-4">
-                    Have an account already? <Link to="/login" className="text-indigo-600 cursor-pointer hover:underline">Login now</Link>
+                    Have an account already? <Link to="/login" className="text-green-600 cursor-pointer hover:underline">Login now</Link>
                 </p>
             </div>
         </div>
+        </div>
+        
     );
 }
 

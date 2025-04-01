@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
 
 function Role() {
   const [role, setRole] = useState("");
@@ -16,7 +17,9 @@ function Role() {
   };
 
   return (
-    <div className="h-screen flex justify-center items-center bg-gray-100">
+    <div className="h-screen flex flex-col">
+      <Navbar/>
+      <div className="h-full flex justify-center items-center bg-gray-100">
       <div className="bg-white shadow-lg rounded-lg p-8 w-96">
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Select Your Role
@@ -27,7 +30,7 @@ function Role() {
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="w-full px-4 py-2 mb-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="w-full px-4 py-2 mb-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none"
         >
           <option value="">Select Role</option>
           <option value="customer">Customer</option>
@@ -36,12 +39,14 @@ function Role() {
 
         <button
           onClick={handleNext}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 font-bold rounded-md transition duration-200"
+          className="w-full bg-green-500 hover:bg-green-600 text-white py-2 font-bold rounded-md transition duration-200"
         >
           Next
         </button>
       </div>
     </div>
+    </div>
+    
   );
 }
 
